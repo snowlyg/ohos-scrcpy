@@ -33,17 +33,5 @@ func main() {
 		return
 	}
 	fmt.Printf("Device Info: %+v\n", deviceInfo)
-
-	go connector.Run()
-	select {}
-	// for {
-	// 	// io.ReadAll(connector.R)
-	// 	_, err = io.Copy(f, connector.R)
-	// 	if err == io.EOF {
-	// 		break
-	// 	} else if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
-	// f.Write(connector.R)
+	connector.SaveToDesk()
 }

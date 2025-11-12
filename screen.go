@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ type DeviceConnector struct {
 
 	R *io.PipeReader
 	W *io.PipeWriter
+	F *os.File
 }
 
 // 命令类型（必须与服务器保持一致）
@@ -58,7 +60,16 @@ func NewDeviceConnector(host string, port int) *DeviceConnector {
 		Host: host,
 		Port: port,
 	}
-	dc.R, dc.W = io.Pipe()
+	if dc.R == nil || dc.W != nil {
+		dc.R, dc.W = io.Pipe()
+	}
+	if dc.F == nil {
+		f, err := os.Create("./output.h264")
+		if err != nil {
+			panic(err)
+		}
+		dc.F = f
+	}
 	return dc
 }
 
@@ -89,6 +100,9 @@ func (dc *DeviceConnector) Close() {
 	}
 	if dc.W != nil {
 		dc.W.Close()
+	}
+	if dc.F != nil {
+		dc.F.Close()
 	}
 }
 
@@ -219,12 +233,7 @@ func (dc *DeviceConnector) Exit() error {
 	return dc.SendCommand(CMD_EXIT, nil)
 }
 
-func (sr *DeviceConnector) Run() {
-	// f, err := os.Create("./output.h264")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer f.Close()
+func (sr *DeviceConnector) SendToPipe() {
 	// 接收帧数据
 	for {
 		// 接收头部
@@ -249,6 +258,45 @@ func (sr *DeviceConnector) Run() {
 			continue
 		}
 		n, err := sr.W.Write(data)
+		if err != nil {
+			log.Printf("Write get error %s\n", err.Error())
+		}
+		log.Printf("Wrote %d bytes to pipe\n", n)
+	}
+}
+
+func (sr *DeviceConnector) SaveToDesk() {
+	if sr.F == nil {
+		f, err := os.Create("./output.h264")
+		if err != nil {
+			panic(err)
+		}
+		sr.F = f
+	}
+	// 接收帧数据
+	for {
+		// 接收头部
+		header := make([]byte, 5)
+		if _, err := io.ReadFull(sr.Conn, header); err != nil {
+			log.Printf("ReadFull get error %s\n", err.Error())
+			continue
+		}
+
+		pktType := int(header[0])
+		if pktType != PKT_SCREEN_FRAME {
+			// fmt.Printf("Received unknown packet type: %d\n", pktType)
+			continue
+		}
+
+		length := binary.LittleEndian.Uint32(header[1:])
+		log.Printf("Received packet length: %d, type: %d\n", length, pktType)
+
+		data := make([]byte, length)
+		if _, err := io.ReadFull(sr.Conn, data); err != nil {
+			log.Printf("ReadFull get error %s\n", err.Error())
+			continue
+		}
+		n, err := sr.F.Write(data)
 		if err != nil {
 			log.Printf("Write get error %s\n", err.Error())
 		}

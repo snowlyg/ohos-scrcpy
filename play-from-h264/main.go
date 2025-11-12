@@ -60,7 +60,7 @@ func main() { //nolint
 	}
 	fmt.Printf("Device Info: %+v\n", deviceInfo)
 
-	go connector.Run()
+	go connector.SendToPipe()
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
@@ -122,7 +122,7 @@ func main() { //nolint
 			if h264Err != nil {
 				panic(h264Err)
 			}
-
+			// log.Printf("nal:%+v\n", nal)
 			if len(nal.Data) == 0 {
 				continue
 			}
